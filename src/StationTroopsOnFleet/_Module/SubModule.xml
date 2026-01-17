@@ -1,0 +1,21 @@
+<Module>
+	<Name value="Station Troops On Fleet"/>
+	<Id value="StationTroopsOnFleet"/>
+	<Version value="v1.0.0"/>
+	<DefaultModule value="false"/>
+	<ModuleCategory value="Singleplayer"/>
+	<Official value="false"/>
+	<DependedModules>
+		<DependedModule Id="Bannerlord.Harmony"/>
+		<DependedModule Id="NavalDLC"/>
+	</DependedModules>
+    <SubModules>
+        <SubModule>
+            <Name value="StationTroopsOnFleet"/>
+            <DLLName value="StationTroopsOnFleet.dll"/>
+            <SubModuleClassType value="StationTroopsOnFleet.SubModule"/>
+            <Tags />
+        </SubModule>
+    </SubModules>
+</Module>
+
