@@ -76,9 +76,6 @@ namespace StationTroopsWithFleet.Behaviors
 
         private void station_troops_input_on_consequence(MenuCallbackArgs args)
         {
-            MobileParty leftParty = new MobileParty();
-            leftParty.Party.SetCustomName(new TextObject("{=!!!!}Station Troops"));
-            PartyScreenHelper.OpenScreenAsManageTroopsAndPrisoners(leftParty, onPartyScreenClosed);
             PartyState partyState = Game.Current.GameStateManager.CreateState<PartyState>();
             partyState.IsDonating = false;
             partyState.PartyScreenMode = PartyScreenHelper.PartyScreenMode.Normal;
@@ -86,6 +83,8 @@ namespace StationTroopsWithFleet.Behaviors
             IsTroopTransferableDelegate troopTransferableDelegate = PartyScreenHelper.ClanManageTroopAndPrisonerTransferableDelegate;
             PartyScreenHelper.PartyScreenMode partyScreenMode = partyState.PartyScreenMode;
             PartyPresentationDoneButtonDelegate partyPresentationDoneButtonDelegate = ManageTroopsAndPrisonersDoneHandler;
+            MobileParty leftParty = new MobileParty();
+            leftParty.Party.SetCustomName(new TextObject("{=!!!!}Station Troops"));
             PartyScreenLogicInitializationData initializationData = PartyScreenLogicInitializationData.CreateBasicInitDataWithMainPartyAndOther(leftParty, PartyScreenLogic.TransferState.Transferable, PartyScreenLogic.TransferState.Transferable, PartyScreenLogic.TransferState.Transferable, troopTransferableDelegate, partyScreenMode, new TextObject("{=uQgNPJnc}Manage Troops"), partyPresentationDoneButtonDelegate, null, null, null, onPartyScreenClosed);
             initializationData.LeftPartyMembersSizeLimit = 0;
             initializationData.LeftPartyPrisonersSizeLimit = 0;
