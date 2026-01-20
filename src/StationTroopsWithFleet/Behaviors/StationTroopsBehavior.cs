@@ -1,13 +1,16 @@
 ﻿using Helpers;
+using StationTroopsWithFleet.Roster;
 using StationTroopsWithFleet.Station;
 using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
+using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.ViewModelCollection.Party;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
@@ -19,6 +22,19 @@ namespace StationTroopsWithFleet.Behaviors
         public int TroopsToStation { get; set; } = 0;
 
         internal StationedTroopsManager _stationedTroopsManager;
+
+        internal TroopStationRosterManager _troopStationRosterManager;
+
+        public StationTroopsBehavior()
+        {
+            _stationedTroopsManager ??= new();
+            _troopStationRosterManager ??= new();
+            TroopStationRoster troopStationRoster = _troopStationRosterManager.FindTroopStationRoster();
+            if (troopStationRoster != null)
+            {
+                TroopsToStation = troopStationRoster.MemberRoster.TotalManCount;
+            }
+        }
 
         public override void RegisterEvents()
         {
@@ -60,21 +76,46 @@ namespace StationTroopsWithFleet.Behaviors
 
         private void station_troops_input_on_consequence(MenuCallbackArgs args)
         {
-            InformationManager.ShowTextInquiry(new TextInquiryData("Input amount", "", true, false, GameTexts.FindText("str_done", null).ToString(), null, delegate (string input)
-            {
-                int.TryParse(input, out int result);
-                if (result == 0)
-                {
-                    InformationManager.DisplayMessage(new InformationMessage(new TextObject("{=!!!!}Amount must be a valid integer.").ToString(), Color.FromUint(0x00FF0000)));
-                }
-                else
-                {
-                    TroopsToStation = result;
-                    Campaign.Current.GameMenuManager.RefreshMenuOptions(args.MenuContext);
-                    SetMenuText(args);
-                }
+            MobileParty leftParty = new MobileParty();
+            leftParty.Party.SetCustomName(new TextObject("{=!!!!}Station Troops"));
+            PartyScreenHelper.OpenScreenAsManageTroopsAndPrisoners(leftParty, onPartyScreenClosed);
+            PartyState partyState = Game.Current.GameStateManager.CreateState<PartyState>();
+            partyState.IsDonating = false;
+            partyState.PartyScreenMode = PartyScreenHelper.PartyScreenMode.Normal;
+            PartyScreenLogic partyScreenLogic = new PartyScreenLogic();
+            IsTroopTransferableDelegate troopTransferableDelegate = PartyScreenHelper.ClanManageTroopAndPrisonerTransferableDelegate;
+            PartyScreenHelper.PartyScreenMode partyScreenMode = partyState.PartyScreenMode;
+            PartyPresentationDoneButtonDelegate partyPresentationDoneButtonDelegate = ManageTroopsAndPrisonersDoneHandler;
+            PartyScreenLogicInitializationData initializationData = PartyScreenLogicInitializationData.CreateBasicInitDataWithMainPartyAndOther(leftParty, PartyScreenLogic.TransferState.Transferable, PartyScreenLogic.TransferState.Transferable, PartyScreenLogic.TransferState.Transferable, troopTransferableDelegate, partyScreenMode, new TextObject("{=uQgNPJnc}Manage Troops"), partyPresentationDoneButtonDelegate, null, null, null, onPartyScreenClosed);
+            initializationData.LeftPartyMembersSizeLimit = 0;
+            initializationData.LeftPartyPrisonersSizeLimit = 0;
+            partyScreenLogic.Initialize(initializationData);
+            partyState.PartyScreenLogic = partyScreenLogic;
+            Game.Current.GameStateManager.PushState(partyState);
+            Campaign.Current.GameMenuManager.RefreshMenuOptions(args.MenuContext);
+            SetMenuText(args);
+        }
 
-            }, null));
+        private void onPartyScreenClosed(PartyBase leftOwnerParty, TroopRoster leftMemberRoster, TroopRoster leftPrisonRoster, PartyBase rightOwnerParty, TroopRoster rightMemberRoster, TroopRoster rightPrisonRoster, bool fromCancel)
+        {
+            if (leftMemberRoster.TotalManCount > 0)
+            {
+                TroopsToStation = leftMemberRoster.TotalManCount;
+                SaveTroopStationRoster(leftMemberRoster, leftPrisonRoster);
+                foreach (TroopRosterElement element in leftMemberRoster.GetTroopRoster())
+                {
+                    rightOwnerParty.MemberRoster.AddToCounts(element.Character, element.Number, false, element.WoundedNumber);
+                }
+                foreach (TroopRosterElement element2 in leftPrisonRoster.GetTroopRoster())
+                {
+                    rightOwnerParty.PrisonRoster.AddToCounts(element2.Character, element2.Number, false, element2.WoundedNumber);
+                }
+            }
+        }
+
+        private static bool ManageTroopsAndPrisonersDoneHandler(TroopRoster leftMemberRoster, TroopRoster leftPrisonRoster, TroopRoster rightMemberRoster, TroopRoster rightPrisonRoster, FlattenedTroopRoster takenPrisonerRoster, FlattenedTroopRoster releasedPrisonerRoster, bool isForced, PartyBase leftParty = null, PartyBase rightParty = null)
+        {
+            return true;
         }
 
         private bool station_troops_none_on_condition(MenuCallbackArgs args)
@@ -132,17 +173,22 @@ namespace StationTroopsWithFleet.Behaviors
             args.MenuContext.SetAmbientSound("event:/map/ambient/node/settlements/2d/port");
         }
 
-        public StationTroopsBehavior() => _stationedTroopsManager ??= new();
+        public StationedTroops StationTroops(TroopRoster memberRoster, TroopRoster prisonRoster) => _stationedTroopsManager.StationTroops(memberRoster, prisonRoster);
 
-        public StationedTroops StationTroops(AnchorPoint anchorPoint, TroopRoster memberRoster, TroopRoster prisonRoster) => _stationedTroopsManager.StationTroops(anchorPoint, memberRoster, prisonRoster);
+        public void RemoveStationedTroops() => _stationedTroopsManager.RemoveStationedTroops();
 
-        public void RemoveStationedTroops(AnchorPoint anchorPoint) => _stationedTroopsManager.RemoveStationedTroops(anchorPoint);
+        public StationedTroops FindStationedTroops() => _stationedTroopsManager.FindStationedTroops();
 
-        public StationedTroops FindStationedTroops(AnchorPoint anchorPoint) => _stationedTroopsManager.FindStationedTroops(anchorPoint);
+        public TroopStationRoster SaveTroopStationRoster(TroopRoster memberRoster, TroopRoster prisonRoster) => _troopStationRosterManager.SaveTroopStationRoster(memberRoster, prisonRoster);
+
+        public void RemoveTroopStationRoster() => _troopStationRosterManager.RemoveTroopStationRoster();
+
+        public TroopStationRoster FindTroopStationRoster() => _troopStationRosterManager.FindTroopStationRoster();
 
         public override void SyncData(IDataStore dataStore)
         {
             dataStore.SyncData("_stationedTroopsManager", ref _stationedTroopsManager);
+            dataStore.SyncData("_troopStationRosterManager", ref _troopStationRosterManager);
             if (dataStore.IsLoading)
             {
                 _stationedTroopsManager ??= new();

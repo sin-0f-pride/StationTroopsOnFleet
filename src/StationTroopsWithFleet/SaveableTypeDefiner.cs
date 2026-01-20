@@ -1,5 +1,5 @@
 ﻿using System.Collections.Generic;
-
+using StationTroopsWithFleet.Roster;
 using StationTroopsWithFleet.Station;
 
 namespace StationTroopsWithFleet
@@ -12,11 +12,14 @@ namespace StationTroopsWithFleet
         {
             AddClassDefinition(typeof(StationedTroops), 1);
             AddClassDefinition(typeof(StationedTroopsManager), 2);
+            AddClassDefinition(typeof(TroopStationRoster), 3);
+            AddClassDefinition(typeof(TroopStationRosterManager), 4);
         }
 
         protected override void DefineContainerDefinitions()
         {
             ConstructContainerDefinition(typeof(List<StationedTroops>));
+            ConstructContainerDefinition(typeof(List<TroopStationRoster>));
         }
     }
 }

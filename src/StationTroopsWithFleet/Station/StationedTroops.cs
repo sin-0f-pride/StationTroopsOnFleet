@@ -8,7 +8,7 @@ namespace StationTroopsWithFleet.Station
     internal class StationedTroops
     {
         [SaveableProperty(1)]
-        public AnchorPoint AnchorPoint { get; private set; }
+        public AnchorPoint AnchorPoint { get; set; }
 
         [SaveableProperty(2)]
         public TroopRoster MemberRoster { get; set; }

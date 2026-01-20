@@ -1,42 +1,46 @@
 ﻿using HarmonyLib;
 using StationTroopsWithFleet.Behaviors;
+using StationTroopsWithFleet.Roster;
 using StationTroopsWithFleet.Station;
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.Xml.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
 using TaleWorlds.InputSystem;
+using TaleWorlds.Library;
 
 namespace StationTroopsWithFleet.Patches
 {
     [HarmonyPatch(typeof(AnchorPoint), "SetPosition")]
     public class SetPositionPatch
     {
+        private static StationTroopsBehavior _behavior;
+
         public static void Postfix(AnchorPoint __instance)
         {
             if (__instance.Owner != null && __instance.Owner == MobileParty.MainParty && __instance.Owner.IsTransitionInProgress)
             {
-                StationTroopsBehavior behavior = Campaign.Current.GetCampaignBehavior<StationTroopsBehavior>();
-                if (behavior.TroopsToStation != 0)
+                _behavior = Campaign.Current.GetCampaignBehavior<StationTroopsBehavior>();
+                if (_behavior.TroopsToStation != 0)
                 {
-                    if (behavior.FindStationedTroops(__instance) == null)
+                    if (_behavior.FindStationedTroops() == null)
                     {
-                        behavior.StationTroops(__instance, StationTroops(__instance.Owner, behavior.TroopsToStation), StationPrisoners(__instance.Owner));
+                        TroopStationRoster troopStationRoster = _behavior.FindTroopStationRoster();
+                        _behavior.StationTroops(StationTroops(__instance.Owner, troopStationRoster.MemberRoster, _behavior.TroopsToStation), StationPrisoners(__instance.Owner, troopStationRoster.PrisonRoster));
                     }
                 }
             }
         }
 
-        private static TroopRoster StationTroops(MobileParty party, int troopsToStation)
+        private static TroopRoster StationTroops(MobileParty party, TroopRoster troopStationRoster, int troopsToStation)
         {
             TroopRoster memberRoster = TroopRoster.CreateDummyTroopRoster();
-            int totalManCountCached = party.MemberRoster.TotalManCount;
-            if (totalManCountCached > 0)
+            if (party.MemberRoster.TotalManCount > 0)
             {
-                int stationed = 0;
                 foreach (TroopRosterElement element in party.MemberRoster.GetTroopRoster())
                 {
                     if (!element.Character.IsHero)
@@ -47,15 +51,13 @@ namespace StationTroopsWithFleet.Patches
                             party.MemberRoster.AddToCounts(element.Character, -element.Number);
                             continue;
                         }
-                        for (int i = 0; i < element.Number; i++)
+                        foreach (TroopRosterElement element2 in troopStationRoster.GetTroopRoster())
                         {
-                            memberRoster.AddToCounts(element.Character, 1, false, element.WoundedNumber);
-                            party.MemberRoster.AddToCounts(element.Character, -1);
-                            stationed++;
-                            if (stationed >= troopsToStation)
+                            if (element.Character == element2.Character)
                             {
-                                SubModule.Log("stationed=" + stationed);
-                                return memberRoster;
+                                memberRoster.AddToCounts(element2.Character, element2.Number, false, element2.WoundedNumber);
+                                party.MemberRoster.AddToCounts(element2.Character, -element2.Number);
+                                continue;
                             }
                         }
                     }
@@ -64,17 +66,21 @@ namespace StationTroopsWithFleet.Patches
             return memberRoster;
         }
 
-        private static TroopRoster StationPrisoners(MobileParty party)
+        private static TroopRoster StationPrisoners(MobileParty party, TroopRoster troopStationRoster)
         {
             TroopRoster prisonRoster = TroopRoster.CreateDummyTroopRoster();
-            if (party.PrisonRoster.TotalManCount > 0)
+            if (_behavior.TroopsToStation > 0 && party.PrisonRoster.TotalManCount > 0)
             {
-                foreach (TroopRosterElement troop in party.PrisonRoster.GetTroopRoster())
+                foreach (TroopRosterElement element in party.PrisonRoster.GetTroopRoster())
                 {
-                    if (!troop.Character.IsHero)
+                    foreach (TroopRosterElement element2 in troopStationRoster.GetTroopRoster())
                     {
-                        prisonRoster.AddToCounts(troop.Character, troop.Number, false, troop.WoundedNumber);
-                        party.PrisonRoster.AddToCounts(troop.Character, -troop.Number);
+                        if (element.Character == element2.Character)
+                        {
+                            prisonRoster.AddToCounts(element2.Character, element2.Number, false, element2.WoundedNumber);
+                            party.PrisonRoster.AddToCounts(element2.Character, -element2.Number);
+                            continue;
+                        }
                     }
                 }
             }
@@ -89,7 +95,7 @@ namespace StationTroopsWithFleet.Patches
             if (__instance.Owner != null && __instance.Owner == MobileParty.MainParty && __instance.Owner.IsCurrentlyAtSea && !__instance.Owner.IsTransitionInProgress)
             {
                 StationTroopsBehavior behavior = Campaign.Current.GetCampaignBehavior<StationTroopsBehavior>();
-                StationedTroops stationedTroops = behavior.FindStationedTroops(__instance);
+                StationedTroops stationedTroops = behavior.FindStationedTroops();
                 if (stationedTroops != null)
                 {
                     if (stationedTroops.MemberRoster.TotalManCount > 0)
@@ -110,7 +116,7 @@ namespace StationTroopsWithFleet.Patches
                             prisonRoster.AddToCounts(troop.Character, -troop.Number);
                         }
                     }
-                    behavior.RemoveStationedTroops(__instance);
+                    behavior.RemoveStationedTroops();
                 }
             }
         }

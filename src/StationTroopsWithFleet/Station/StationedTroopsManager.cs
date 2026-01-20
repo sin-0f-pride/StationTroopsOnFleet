@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using StationTroopsWithFleet.Roster;
+using System.Collections.Generic;
 
 using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
@@ -10,42 +11,35 @@ namespace StationTroopsWithFleet.Station
     internal sealed class StationedTroopsManager
     {
         [SaveableField(1)]
-        private List<StationedTroops> _stationedTroops;
+        private StationedTroops? _stationedTroops;
 
-        internal StationedTroopsManager() => _stationedTroops ??= new();
+        internal StationedTroopsManager() { }
 
-        public StationedTroops StationTroops(AnchorPoint anchorPoint, TroopRoster memberRoster, TroopRoster prisonRoster)
+        public StationedTroops StationTroops(TroopRoster memberRoster, TroopRoster prisonRoster)
         {
-            StationedTroops stationedtroops = FindStationedTroops(anchorPoint);
+            StationedTroops stationedtroops = FindStationedTroops();
             if (stationedtroops != null)
             {
+                stationedtroops.AnchorPoint = null!;
                 stationedtroops.MemberRoster = memberRoster;
                 stationedtroops.PrisonRoster = prisonRoster;
                 return stationedtroops;
             }
-            stationedtroops = new StationedTroops(anchorPoint, memberRoster, prisonRoster);
-            _stationedTroops.Add(stationedtroops);
+            stationedtroops = new StationedTroops(null!, memberRoster, prisonRoster);
+            _stationedTroops = stationedtroops;
             return stationedtroops;
         }
 
-        public void RemoveStationedTroops(AnchorPoint anchorPoint)
+        public void RemoveStationedTroops()
         {
-            StationedTroops stationedtroops = FindStationedTroops(anchorPoint);
-            if (stationedtroops == null)
-            {
-                return;
-            }
-            _stationedTroops.Remove(stationedtroops);
+            _stationedTroops = null;
         }
 
-        public StationedTroops FindStationedTroops(AnchorPoint anchorPoint)
+        public StationedTroops FindStationedTroops()
         {
-            foreach (StationedTroops stationedTroops in _stationedTroops)
+            if (_stationedTroops != null)
             {
-                if (stationedTroops.AnchorPoint == anchorPoint)
-                {
-                    return stationedTroops;
-                }
+                return _stationedTroops;
             }
             return null!;
         }
